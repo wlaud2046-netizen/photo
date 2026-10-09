@@ -247,8 +247,12 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   <div class="card">
     <span class="label">맨홀번호 / 지점 입력</span>
     <div class="site-row">
-      <input type="text" id="siteInput" placeholder="예: OMM-01-018" inputmode="text" autocomplete="off">
-      <button class="btn btn-accent" id="startBtn">시작</button>
+      <input type="text" id="prefixInput" placeholder="앞부분" autocapitalize="characters" autocomplete="off" aria-label="번호 앞부분" style="flex:1.35;font-size:21px;text-transform:uppercase">
+      <input type="text" id="numInput" placeholder="번호" inputmode="numeric" pattern="[0-9]*" autocomplete="off" aria-label="번호 뒷부분" style="flex:1;font-size:21px">
+    </div>
+    <div class="site-row" style="margin-top:10px">
+      <button class="btn" id="nextNoBtn" style="display:none;font-size:14px;min-height:56px;color:var(--accent)">다음번호<br>자동입력</button>
+      <button class="btn btn-accent" id="startBtn" style="flex:1">시작</button>
     </div>
   </div>
 
@@ -433,7 +437,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   const $ = id => document.getElementById(id);
-  const siteInput=$('siteInput'), startBtn=$('startBtn'), activeCard=$('activeCard'),
+  const prefixInput=$('prefixInput'), numInput=$('numInput'), nextNoBtn=$('nextNoBtn'), startBtn=$('startBtn'), activeCard=$('activeCard'),
         activeNum=$('activeNum'), nextBadge=$('nextBadge'), shotsEl=$('shots'),
         emptyHint=$('emptyHint'), camBtn=$('camBtn'),
         undoBtn=$('undoBtn'), finishBtn=$('finishBtn'), listCard=$('listCard'),
@@ -512,8 +516,10 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   function startSite(){
-    const v = siteInput.value.trim();
-    if(!v){ showToast('맨홀번호를 입력하세요'); return; }
+    const pfx = prefixInput.value.trim().toUpperCase(), nn = numInput.value.trim();
+    if(!nn){ showToast('맨홀번호(뒷번호)를 입력하세요'); numInput.focus(); return; }
+    const v = pfx + nn;
+    try{ localStorage.setItem('photo_prefix', pfx); localStorage.setItem('photo_lastnum', nn); }catch(e){}
     if(active && active.photos.length === 0){
       // 이전 지점에 사진이 없으면 그냥 번호만 교체
     } else if(active){
@@ -528,7 +534,8 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     } else {
       active = {num:v, photos:[]};
     }
-    siteInput.value='';
+    numInput.value='';
+    updateNextBtn();
     renderActive();
   }
 
@@ -677,7 +684,17 @@ https://github.com/nodeca/pako/blob/main/LICENSE
   }
 
   startBtn.addEventListener('click', startSite);
-  siteInput.addEventListener('keydown', e=>{ if(e.key==='Enter') startSite(); });
+  function incrNum(s){ const m=/^(\d+)$/.exec(String(s||'')); return m? String(parseInt(m[1],10)+1).padStart(m[1].length,'0') : ''; }
+  function updateNextBtn(){
+    let last=''; try{ last=localStorage.getItem('photo_lastnum')||''; }catch(e){}
+    nextNoBtn.style.display = incrNum(last) ? '' : 'none';
+  }
+  try{ prefixInput.value = localStorage.getItem('photo_prefix') || ''; }catch(e){}
+  updateNextBtn();
+  prefixInput.addEventListener('input', ()=>{ const p=prefixInput.selectionStart; prefixInput.value=prefixInput.value.toUpperCase(); try{prefixInput.setSelectionRange(p,p);}catch(e){} });
+  numInput.addEventListener('input', ()=>{ const nv=numInput.value.replace(/\D/g,''); if(nv!==numInput.value) numInput.value=nv; });
+  nextNoBtn.addEventListener('click', ()=>{ let last=''; try{ last=localStorage.getItem('photo_lastnum')||''; }catch(e){} numInput.value=incrNum(last); });
+  [prefixInput,numInput].forEach(el=>el.addEventListener('keydown', e=>{ if(e.key==='Enter') startSite(); }));
 
   // ---- 연속 촬영 (페이지 안에서 카메라를 켜두고 여러 장을 계속 찍은 뒤 한 번에 반영) ----
   const camOverlay=$('camOverlay'), camVideo=$('camVideo'), camFlash=$('camFlash'),
@@ -848,7 +865,7 @@ https://github.com/nodeca/pako/blob/main/LICENSE
     active = null;
     activeCard.style.display='none';
     renderSummary();
-    siteInput.focus();
+    numInput.focus();
     showToast('지점 저장됨. 다음 맨홀번호를 입력하세요');
   });
 
